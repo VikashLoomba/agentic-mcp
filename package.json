@@ -1,0 +1,39 @@
+{
+  "name": "mcp-codegen",
+  "version": "1.0.0",
+  "description": "A code generation example tool for Model Context Protocol (MCP) tools. Generates typescript code from MCP server tool schemas that Agents can run as an alternative to providing tool definitions at runtime.",
+  "homepage": "https://github.com/VikashLoomba/mcp-codegen#readme",
+  "bugs": {
+    "url": "https://github.com/VikashLoomba/mcp-codegen/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VikashLoomba/mcp-codegen.git"
+  },
+  "license": "ISC",
+  "author": "Vikash Loomba",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "^0.0.7",
+    "@ai-sdk/openai": "^2.0.64",
+    "@ax-llm/ax": "^14.0.39",
+    "@ax-llm/ax-tools": "^14.0.39",
+    "@mcpjam/sdk": "^0.1.4",
+    "@modelcontextprotocol/sdk": "^1.21.0",
+    "ai": "^5.0.89",
+    "cors": "^2.8.5",
+    "env-paths": "^3.0.0",
+    "express": "^5.1.0",
+    "json-schema-to-typescript": "^15.0.4",
+    "ts-morph": "^27.0.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.0"
+  }
+}
