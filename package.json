@@ -1,14 +1,14 @@
 {
-  "name": "mcp-codegen",
+  "name": "agentic-mcp",
   "version": "1.0.0",
-  "description": "A code generation example tool for Model Context Protocol (MCP) tools. Generates typescript code from MCP server tool schemas that Agents can run as an alternative to providing tool definitions at runtime.",
-  "homepage": "https://github.com/VikashLoomba/mcp-codegen#readme",
+  "description": "Turning MCP servers in to autonomous agents.",
+  "homepage": "https://github.com/VikashLoomba/agentic-mcp#readme",
   "bugs": {
-    "url": "https://github.com/VikashLoomba/mcp-codegen/issues"
+    "url": "https://github.com/VikashLoomba/agentic-mcp/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/VikashLoomba/mcp-codegen.git"
+    "url": "git+https://github.com/VikashLoomba/agentic-mcp.git"
   },
   "license": "ISC",
   "author": "Vikash Loomba",
