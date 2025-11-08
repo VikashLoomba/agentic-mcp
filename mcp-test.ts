@@ -1,46 +1,34 @@
 import { agent, ai, AxMCPClient } from "@ax-llm/ax";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AxMCPStdioTransport } from "@ax-llm/ax-tools";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { getDisplayName } from "@modelcontextprotocol/sdk/shared/metadataUtils.js";
 import { z } from "zod";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { Client } from "@modelcontextprotocol/sdk/client";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
-	type TextContent,
-	type ImageContent,
-	type EmbeddedResource,
-	isInitializeRequest,
-	CallToolResult,
+        type TextContent,
+        type ImageContent,
+        type EmbeddedResource,
+        isInitializeRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { InMemoryEventStore } from "@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js";
 import { randomUUID } from "crypto";
+import {
+        createAgenticAgentServer,
+        type AgenticToolDefinition,
+} from "./src/index.ts";
 // Map to store transports by session ID
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 const chats: { [sessionId: string]: string[] } = {}; // Simple in-memory chat history store
 export interface ToolConfig<
-	TSchema extends Record<string, z.ZodType> = Record<string, z.ZodType>,
-> {
-	name: (name: string) => string;
-	description: (client: Client) => Promise<string>;
-	inputSchema: TSchema;
-	annotations: {
-		readOnlyHint?: boolean;
-		destructiveHint?: boolean;
-		idempotentHint?: boolean;
-		openWorldHint?: boolean;
-	};
-	handler: (
-		params: z.infer<z.ZodObject<TSchema>>
-	) => Promise<string | (TextContent | ImageContent | EmbeddedResource)[]>;
+        TSchema extends Record<string, z.ZodTypeAny> = Record<string, z.ZodTypeAny>,
+> extends AgenticToolDefinition<TSchema> {
+        annotations: NonNullable<AgenticToolDefinition<TSchema>["annotations"]>;
 }
-export function defineTool<TSchema extends Record<string, z.ZodType>>(
-	config: ToolConfig<TSchema>
+export function defineTool<TSchema extends Record<string, z.ZodTypeAny>>(
+        config: ToolConfig<TSchema>
 ) {
-	return config;
+        return config;
 }
 
 const args = [
@@ -63,111 +51,6 @@ app.use(
 		exposedHeaders: ["Mcp-Session-Id"],
 	})
 );
-
-const mcpServerTransport = new StdioServerTransport();
-
-const discoveryClient = new Client({
-	name: "discovery-client",
-	version: "1.0.0",
-});
-
-async function getServer(discoveryClient: Client): Promise<McpServer> {
-	const discoveryClientTransport = new StdioClientTransport({
-		command,
-		args,
-	});
-	await discoveryClient.connect(discoveryClientTransport);
-	// create the mcp server
-	const neonAgentServer = new McpServer(
-		{
-			name: NAME,
-			version: "1.0.0",
-		},
-		{
-			capabilities: {
-				tools: {},
-				logging: {},
-			},
-			instructions:
-				discoveryClient.getInstructions() ??
-				`Natural language interface to ${NAME} tools via an embedded AI agent.`,
-		}
-	);
-
-	neonAgentServer.tool(
-		s.name(NAME),
-		await s.description(discoveryClient),
-		{
-			...s.inputSchema,
-		},
-		{
-			...s.annotations,
-		},
-		async (params, extra): Promise<CallToolResult> => {
-			let contextWithChat = params.context;
-			const sessionId = extra.sessionId;
-			if (sessionId && chats[sessionId]) {
-				contextWithChat +=
-					"\n\nPrevious conversation:\n" + chats[sessionId].join("\n");
-			}
-			const responsePromise = s.handler({
-				...params,
-				context: contextWithChat,
-			});
-			let isDone = false;
-			responsePromise.finally(() => {
-				isDone = true;
-			});
-			const sleep = (ms: number) =>
-				new Promise((resolve) => setTimeout(resolve, ms));
-			let steps = 0;
-
-			const progressToken = extra._meta?.progressToken;
-
-			if (progressToken) {
-				while (!isDone) {
-					await extra.sendNotification({
-						method: "notifications/progress",
-						params: {
-							progress: steps++,
-							progressToken,
-							message: "Still working…",
-						},
-					});
-					await sleep(5000);
-				}
-			}
-			if (extra.sessionId && chats[extra.sessionId]) {
-				chats[extra.sessionId].push(
-					`User: ${params.request}\n Context: ${params.context}`
-				);
-				const responseText = await responsePromise;
-				chats[extra.sessionId].push(`Agent: ${responseText}`);
-			}
-
-			return {
-				content: [
-					{ type: "text", text: JSON.stringify(await responsePromise) },
-				],
-			};
-		}
-	);
-	return neonAgentServer;
-}
-
-// async function main() {
-// 	if (!process.env.OPENAI_API_KEY) {
-// 		throw new Error("OPENAI_API_KEY environment variable is not set.");
-// 	}
-// 	// Find out the MCP server tools
-// 	// Note: When looping:
-// 	// const toolDisplayName = getDisplayName(tool);
-
-// 	await discoveryClient.connect(discoveryClientTransport);
-// 	const neonAgentServer = await getServer(discoveryClient);
-// 	await neonAgentServer.connect(mcpServerTransport);
-// 	console.log(`NeonDB MCP server is running and tool "${NAME}" is registered.`);
-// }
 
 const s = defineTool({
 	name: (name: string) => `use_${name.toLowerCase()}`,
@@ -325,7 +208,14 @@ const mcpPostHandler = async (req: Request, res: Response) => {
 
 			// Connect the transport to the MCP server BEFORE handling the request
 			// so responses can flow back through the same transport
-			const server = await getServer(discoveryClient);
+                        const server = await createAgenticAgentServer({
+                                name: NAME,
+                                version: "1.0.0",
+                                command,
+                                args,
+                                tool: s,
+                                sessionHistories: chats,
+                        });
 			console.log(`Obtained MCP server instance`);
 			console.log(`Connecting new transport for new session to MCP server`);
 			await server.connect(transport);
